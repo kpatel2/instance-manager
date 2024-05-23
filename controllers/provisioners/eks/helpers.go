@@ -214,27 +214,6 @@ spec:
     - --node-labels={{ $first := true }}{{ range $key, $value := .NodeLabels }}{{if not $first}},{{end}}{{ $key }}={{ $value }}{{ $first = false}}{{- end}}
     - --register-with-taints={{ $first := true }}{{- range .NodeTaints}}{{if not $first}},{{end}}{{ .Key }}={{ .Value }}:{{ .Effect }}{{ $first = false}}{{- end}}
 
-#!/bin/bash
-{{range $pre := .PreBootstrap}}{{$pre}}{{end}}
-{{- range .MountOptions}}
-mkfs.{{ .FileSystem | ToLower }} {{ .Device }}
-mkdir {{ .Mount }}
-mount {{ .Device }} {{ .Mount }}
-mount
-{{- if .Persistance}}
-echo "{{ .Device}}    {{ .Mount }}    {{ .FileSystem | ToLower }}    defaults    0    2" >> /etc/fstab
-{{- end}}
-{{- end}}
-if [[ $(type -P $(which aws)) ]] && [[ $(type -P $(which jq)) ]] ; then
-	TOKEN=$(curl -X PUT "http://169.254.169.254/latest/api/token" -H "X-aws-ec2-metadata-token-ttl-seconds: 21600")
-	INSTANCE_ID=$(curl url -H "X-aws-ec2-metadata-token: $TOKEN" http://169.254.169.254/latest/meta-data/instance-id)
-	REGION=$(curl url -H "X-aws-ec2-metadata-token: $TOKEN" http://169.254.169.254/latest/meta-data/placement/region)
-	LIFECYCLE=$(curl url -H "X-aws-ec2-metadata-token: $TOKEN" http://169.254.169.254/latest/meta-data/autoscaling/target-lifecycle-state)
-	if [[ $LIFECYCLE == *"Warmed"* ]]; then
-		rm /var/lib/cloud/instances/$INSTANCE_ID/sem/config_scripts_user
-		exit 0
-	fi
-fi
 `	
 
 	}
