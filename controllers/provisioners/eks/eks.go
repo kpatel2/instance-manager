@@ -41,9 +41,10 @@ const (
 	CustomNetworkingHostPodsAnnotation                = "instancemgr.keikoproj.io/custom-networking-host-pods"
 	CustomNetworkingPrefixAssignmentEnabledAnnotation = "instancemgr.keikoproj.io/custom-networking-prefix-assignment-enabled"
 
-	OsFamilyWindows      = "windows"
-	OsFamilyBottleRocket = "bottlerocket"
-	OsFamilyAmazonLinux2 = "amazonlinux2"
+	OsFamilyWindows      	= "windows"
+	OsFamilyBottleRocket 	= "bottlerocket"
+	OsFamilyAmazonLinux2 	= "amazonlinux2"
+	OsFamilyAmazonLinux2023	= "amazonlinux2023"
 )
 
 var (
@@ -54,7 +55,7 @@ var (
 	InstanceMgrLifecycleLabel = "instancemgr.keikoproj.io/lifecycle"
 	InstanceMgrImageLabel     = "instancemgr.keikoproj.io/image"
 
-	AllowedOsFamilies      = []string{OsFamilyWindows, OsFamilyBottleRocket, OsFamilyAmazonLinux2}
+	AllowedOsFamilies      = []string{OsFamilyWindows, OsFamilyBottleRocket, OsFamilyAmazonLinux2, OsFamilyAmazonLinux2023}
 	DefaultManagedPolicies = []string{"AmazonEKSWorkerNodePolicy", "AmazonEC2ContainerRegistryReadOnly"}
 	CNIManagedPolicy       = "AmazonEKS_CNI_Policy"
 	SupportedArchitectures = []string{"x86_64", "arm64"}
@@ -125,6 +126,7 @@ type EKSUserData struct {
 	PostBootstrap    []string
 	MountOptions     []MountOpts
 	MaxPods          int64
+	ClusterIP		 string
 }
 
 func (ctx *EksInstanceGroupContext) GetInstanceGroup() *v1alpha1.InstanceGroup {

@@ -121,6 +121,8 @@ func (ctx *EksInstanceGroupContext) GetBasicUserData(clusterName, args string, k
 		nodeLabels       = ctx.GetComputedLabels()
 		nodeTaints       = configuration.GetTaints()
 		bootstrapOptions = ctx.GetComputedBootstrapOptions()
+		cluster          = state.GetCluster()
+		clusterIP        = ctx.AwsWorker.GetDNSClusterIP(cluster)
 	)
 	var maxPods int64 = 0
 
@@ -193,6 +195,48 @@ set -o xtrace
 /etc/eks/bootstrap.sh {{ .ClusterName }} {{ .Arguments }}
 set +o xtrace
 {{range $post := .PostBootstrap}}{{$post}}{{end}}`
+case OsFamilyAmazonLinux2023:
+	UserDataTemplate = `
+---
+apiVersion: node.eks.aws/v1alpha1
+kind: NodeConfig
+spec:
+  cluster:
+    name: "{{ .ClusterName }}"
+    apiServerEndpoint: "{{ .ApiEndpoint }}"
+    certificateAuthority: "{{ .ClusterCA }}"
+    cidr: 10.192.64.0/18
+  kubelet:
+    config:
+      clusterdns:
+        - "{{ .ClusterIP }}"
+  flags:
+    - --node-labels={{ $first := true }}{{ range $key, $value := .NodeLabels }}{{if not $first}},{{end}}{{ $key }}={{ $value }}{{ $first = false}}{{- end}}
+    - --register-with-taints={{ $first := true }}{{- range .NodeTaints}}{{if not $first}},{{end}}{{ .Key }}={{ .Value }}:{{ .Effect }}{{ $first = false}}{{- end}}
+
+#!/bin/bash
+{{range $pre := .PreBootstrap}}{{$pre}}{{end}}
+{{- range .MountOptions}}
+mkfs.{{ .FileSystem | ToLower }} {{ .Device }}
+mkdir {{ .Mount }}
+mount {{ .Device }} {{ .Mount }}
+mount
+{{- if .Persistance}}
+echo "{{ .Device}}    {{ .Mount }}    {{ .FileSystem | ToLower }}    defaults    0    2" >> /etc/fstab
+{{- end}}
+{{- end}}
+if [[ $(type -P $(which aws)) ]] && [[ $(type -P $(which jq)) ]] ; then
+	TOKEN=$(curl -X PUT "http://169.254.169.254/latest/api/token" -H "X-aws-ec2-metadata-token-ttl-seconds: 21600")
+	INSTANCE_ID=$(curl url -H "X-aws-ec2-metadata-token: $TOKEN" http://169.254.169.254/latest/meta-data/instance-id)
+	REGION=$(curl url -H "X-aws-ec2-metadata-token: $TOKEN" http://169.254.169.254/latest/meta-data/placement/region)
+	LIFECYCLE=$(curl url -H "X-aws-ec2-metadata-token: $TOKEN" http://169.254.169.254/latest/meta-data/autoscaling/target-lifecycle-state)
+	if [[ $LIFECYCLE == *"Warmed"* ]]; then
+		rm /var/lib/cloud/instances/$INSTANCE_ID/sem/config_scripts_user
+		exit 0
+	fi
+fi
+`	
+
 	}
 
 	data := EKSUserData{
@@ -207,6 +251,8 @@ set +o xtrace
 		PreBootstrap:     payload.PreBootstrap,
 		PostBootstrap:    payload.PostBootstrap,
 		MountOptions:     mounts,
+		ClusterIP:		  clusterIP,
+		
 	}
 	out := &bytes.Buffer{}
 	tmpl := template.New("userData").Funcs(template.FuncMap{
