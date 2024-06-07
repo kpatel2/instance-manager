@@ -196,8 +196,7 @@ set -o xtrace
 set +o xtrace
 {{range $post := .PostBootstrap}}{{$post}}{{end}}`
 case OsFamilyAmazonLinux2023:
-	UserDataTemplate = `
-MIME-Version: 1.0
+	UserDataTemplate = `MIME-Version: 1.0
 Content-Type: multipart/mixed; boundary="al2023"
 
 --al2023
