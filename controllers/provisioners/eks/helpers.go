@@ -224,8 +224,30 @@ Content-Type: text/x-shellscript; charset="us-ascii"
 
 #!/bin/bash
 set -ex
-touch /tmp/config
-echo "testing kp al2023" > /tmp/config
+{{range $pre := .PreBootstrap}}{{$pre}}{{end}}
+{{- range .MountOptions}}
+mkfs.{{ .FileSystem | ToLower }} {{ .Device }}
+mkdir {{ .Mount }}
+mount {{ .Device }} {{ .Mount }}
+mount
+{{- if .Persistance}}
+echo "{{ .Device}}    {{ .Mount }}    {{ .FileSystem | ToLower }}    defaults    0    2" >> /etc/fstab
+{{- end}}
+{{- end}}
+if [[ $(type -P $(which aws)) ]] && [[ $(type -P $(which jq)) ]] ; then
+	TOKEN=$(curl -X PUT "http://169.254.169.254/latest/api/token" -H "X-aws-ec2-metadata-token-ttl-seconds: 21600")
+	INSTANCE_ID=$(curl url -H "X-aws-ec2-metadata-token: $TOKEN" http://169.254.169.254/latest/meta-data/instance-id)
+	REGION=$(curl url -H "X-aws-ec2-metadata-token: $TOKEN" http://169.254.169.254/latest/meta-data/placement/region)
+	LIFECYCLE=$(curl url -H "X-aws-ec2-metadata-token: $TOKEN" http://169.254.169.254/latest/meta-data/autoscaling/target-lifecycle-state)
+	if [[ $LIFECYCLE == *"Warmed"* ]]; then
+		rm /var/lib/cloud/instances/$INSTANCE_ID/sem/config_scripts_user
+		exit 0
+	fi
+fi
+set -o xtrace
+/etc/eks/bootstrap.sh {{ .ClusterName }} {{ .Arguments }}
+set +o xtrace
+{{range $post := .PostBootstrap}}{{$post}}{{end}}
 
 --al2023--`	
 
